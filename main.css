@@ -1,0 +1,12 @@
+/* main.css */
+.justsaveme-highlight {
+  background-color: #947ff0 !important; /* Medium purple */
+  display: inline !important;
+  padding: 2px 0 !important;
+  border-radius: 2px !important;
+  transition: background-color 0.3s ease !important;
+}
+
+.justsaveme-highlight.flash {
+  background-color: #7c66c6 !important; /* Darker purple - flash effect on save */
+}

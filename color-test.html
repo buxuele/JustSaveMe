@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Highlight Color Test</title>
+    <style>
+      body {
+        max-width: 800px;
+        margin: 40px auto;
+        padding: 20px;
+        font-family: system-ui, -apple-system, sans-serif;
+        line-height: 1.6;
+      }
+
+      .controls {
+        position: sticky;
+        top: 0;
+        background: white;
+        padding: 20px 0;
+        border-bottom: 1px solid #eee;
+        margin-bottom: 30px;
+      }
+
+      .color-picker {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+      }
+
+      input[type="color"] {
+        width: 60px;
+        height: 40px;
+        padding: 0;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+
+      .color-value {
+        font-family: monospace;
+        font-size: 16px;
+      }
+
+      .text-sample {
+        margin-bottom: 30px;
+        padding: 20px;
+        border-radius: 8px;
+        background: #f8f9fa;
+      }
+
+      .highlighted {
+        transition: background-color 0.3s ease;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="controls">
+      <div class="color-picker">
+        <input type="color" id="highlightColor" value="#947ff0" />
+        <span class="color-value" id="colorValue">#947ff0</span>
+      </div>
+    </div>
+
+    <div class="text-sample">
+      <p>
+        The art of programming extends far beyond just writing code. It's about
+        solving problems, creating efficient solutions, and building tools that
+        make people's lives easier. When we approach programming with this
+        mindset, we begin to see it as a craft that requires both technical
+        skill and creative thinking.
+      </p>
+    </div>
+
+    <div class="text-sample">
+      <p>
+        Software development is a collaborative effort that brings together
+        different perspectives and expertise. Through version control systems,
+        code reviews, and continuous integration, teams can work together
+        seamlessly while maintaining high quality standards. This cooperation
+        leads to better software and more innovative solutions.
+      </p>
+    </div>
+
+    <div class="text-sample">
+      <p>
+        Learning to code is a journey of continuous discovery. Each new language
+        or framework we learn opens up new possibilities and ways of thinking
+        about problems. The best developers are those who maintain their
+        curiosity and enthusiasm for learning, always staying open to new ideas
+        and approaches.
+      </p>
+    </div>
+
+    <script>
+      const colorPicker = document.getElementById("highlightColor");
+      const colorValue = document.getElementById("colorValue");
+      const samples = document.querySelectorAll(".text-sample p");
+
+      // Add highlight spans to sample text
+      samples.forEach((sample) => {
+        const text = sample.textContent;
+        sample.innerHTML = `<span class="highlighted">${text}</span>`;
+      });
+
+      function updateHighlightColor(color) {
+        colorValue.textContent = color;
+        document.querySelectorAll(".highlighted").forEach((el) => {
+          el.style.backgroundColor = color;
+        });
+      }
+
+      // Initial highlight
+      updateHighlightColor(colorPicker.value);
+
+      // Update on color change
+      colorPicker.addEventListener("input", (e) => {
+        updateHighlightColor(e.target.value);
+      });
+    </script>
+  </body>
+</html>
