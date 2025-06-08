@@ -2,6 +2,10 @@
 // ok
 
 // popup.js
+let snippetsCache = null;
+let lastLoadTime = 0;
+const CACHE_DURATION = 5000; // 5秒缓存
+
 document.addEventListener("DOMContentLoaded", () => {
   loadSnippets();
   document
@@ -12,42 +16,94 @@ document.addEventListener("DOMContentLoaded", () => {
     .addEventListener("click", clearAllSnippets);
 });
 
+function showStatus(message, type = 'info') {
+  const statusEl = document.getElementById('status-message');
+  if (!statusEl) {
+    const newStatusEl = document.createElement('div');
+    newStatusEl.id = 'status-message';
+    newStatusEl.className = `status-message ${type}`;
+    document.body.insertBefore(newStatusEl, document.body.firstChild);
+    newStatusEl.textContent = message;
+  } else {
+    statusEl.textContent = message;
+    statusEl.className = `status-message ${type}`;
+  }
+  setTimeout(() => {
+    if (statusEl) {
+      statusEl.textContent = '';
+      statusEl.className = 'status-message';
+    }
+  }, 3000);
+}
+
 function loadSnippets() {
-  const dbRequest = indexedDB.open("TextCollectorDB", 1);
+  const container = document.getElementById("snippets-container");
+  container.innerHTML = '<div class="loading">Loading...</div>';
+  
+  const now = Date.now();
+  if (snippetsCache && (now - lastLoadTime) < CACHE_DURATION) {
+    displaySnippets(snippetsCache);
+    return;
+  }
 
-  dbRequest.onsuccess = (event) => {
-    const db = event.target.result;
-    const transaction = db.transaction("snippets", "readonly");
-    const store = transaction.objectStore("snippets");
-    const request = store.getAll();
+  let retryCount = 0;
+  const maxRetries = 3;
+  
+  function tryLoadSnippets() {
+    const dbRequest = indexedDB.open("TextCollectorDB", 1);
+    
+    dbRequest.onsuccess = (event) => {
+      const db = event.target.result;
+      const transaction = db.transaction("snippets", "readonly");
+      const store = transaction.objectStore("snippets");
+      
+      const pageSize = 20;
+      const request = store.openCursor();
+      let snippets = [];
+      
+      request.onsuccess = (event) => {
+        const cursor = event.target.result;
+        if (cursor && snippets.length < pageSize) {
+          snippets.push(cursor.value);
+          cursor.continue();
+        } else {
+          snippetsCache = snippets;
+          lastLoadTime = Date.now();
+          displaySnippets(snippets);
+        }
+      };
 
-    request.onsuccess = () => {
-      const snippets = request.result;
-      displaySnippets(snippets);
+      request.onerror = (event) => {
+        console.error("Failed to load snippets:", event.target.error);
+        showStatus("Failed to load snippets", "error");
+      };
     };
-
-    request.onerror = (event) => {
-      console.error("Failed to load snippets:", event.target.error);
-      showError("Failed to load saved snippets");
+    
+    dbRequest.onerror = (event) => {
+      console.error("Database error:", event.target.error);
+      if (retryCount < maxRetries) {
+        retryCount++;
+        showStatus(`Retrying... (${retryCount}/${maxRetries})`, "warning");
+        setTimeout(tryLoadSnippets, 1000);
+      } else {
+        showStatus("Failed to open database after multiple attempts", "error");
+        showError("Failed to open database");
+      }
     };
-  };
-
-  dbRequest.onerror = (event) => {
-    console.error("Database error:", event.target.error);
-    showError("Failed to open database");
-  };
+  }
+  
+  tryLoadSnippets();
 }
 
 function displaySnippets(snippets) {
   const container = document.getElementById("snippets-container");
-  container.innerHTML = "";
-
+  const fragment = document.createDocumentFragment();
+  
   if (snippets.length === 0) {
-    container.innerHTML =
-      '<div class="no-snippets">No saved snippets yet</div>';
+    container.innerHTML = '<div class="no-snippets">No saved snippets yet</div>';
     return;
   }
-
+  
   snippets
     .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
     .forEach((snippet) => {
@@ -58,10 +114,48 @@ function displaySnippets(snippets) {
         <div class="snippet-meta">
           <a href="${escapeHtml(snippet.url)}" target="_blank">Source</a>
           <span>${new Date(snippet.timestamp).toLocaleString()}</span>
+          <button class="delete-snippet" data-id="${snippet.id}">Delete</button>
         </div>
       `;
-      container.appendChild(div);
+      
+      // Add delete functionality
+      const deleteBtn = div.querySelector('.delete-snippet');
+      if (deleteBtn) {
+        deleteBtn.addEventListener('click', () => deleteSnippet(snippet.id));
+      }
+      
+      fragment.appendChild(div);
     });
+    
+  container.innerHTML = '';
+  container.appendChild(fragment);
+}
+
+function deleteSnippet(id) {
+  if (!confirm("Are you sure you want to delete this snippet?")) {
+    return;
+  }
+
+  const dbRequest = indexedDB.open("TextCollectorDB", 1);
+  
+  dbRequest.onsuccess = (event) => {
+    const db = event.target.result;
+    const transaction = db.transaction("snippets", "readwrite");
+    const store = transaction.objectStore("snippets");
+    
+    const request = store.delete(id);
+    
+    request.onsuccess = () => {
+      showStatus("Snippet deleted successfully", "success");
+      snippetsCache = null; // Clear cache
+      loadSnippets();
+    };
+    
+    request.onerror = (event) => {
+      console.error("Error deleting snippet:", event.target.error);
+      showStatus("Failed to delete snippet", "error");
+    };
+  };
 }
 
 function escapeHtml(unsafe) {
@@ -133,17 +227,19 @@ function clearAllSnippets() {
     const request = store.clear();
 
     request.onsuccess = () => {
-      loadSnippets(); // Refresh the display
+      snippetsCache = null; // Clear cache
+      showStatus("All snippets cleared successfully", "success");
+      loadSnippets();
     };
 
     request.onerror = (event) => {
       console.error("Error clearing snippets:", event.target.error);
-      showError("Failed to clear snippets");
+      showStatus("Failed to clear snippets", "error");
     };
   };
 
   dbRequest.onerror = (event) => {
     console.error("Database error:", event.target.error);
-    showError("Failed to open database");
+    showStatus("Failed to open database", "error");
   };
 }
