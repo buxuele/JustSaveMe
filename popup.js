@@ -58,7 +58,9 @@ function loadSnippets() {
       const store = transaction.objectStore("snippets");
       
       const pageSize = 20;
-      const request = store.openCursor();
+      // Use the 'timestamp' index to get the newest snippets first.
+      const timestampIndex = store.index("timestamp");
+      const request = timestampIndex.openCursor(null, "prev"); // "prev" for descending order
       let snippets = [];
       
       request.onsuccess = (event) => {
@@ -67,6 +69,8 @@ function loadSnippets() {
           snippets.push(cursor.value);
           cursor.continue();
         } else {
+          // Snippets are already sorted by timestamp (newest first) due to "prev" cursor.
+          // No need for additional client-side sort if this order is desired.
           snippetsCache = snippets;
           lastLoadTime = Date.now();
           displaySnippets(snippets);
@@ -104,8 +108,11 @@ function displaySnippets(snippets) {
     return;
   }
   
+  // Snippets are now fetched in descending order of timestamp (newest first)
+  // from the database using the timestamp index and a 'prev' cursor.
+  // So, this client-side sort is no longer necessary.
   snippets
-    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+    // .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
     .forEach((snippet) => {
       const div = document.createElement("div");
       div.className = "snippet";
@@ -195,7 +202,17 @@ function exportSnippets() {
             .slice(0, 10)}.json`,
           saveAs: true,
         },
-        () => {
+        (downloadId) => {
+          if (chrome.runtime.lastError) {
+            console.error("Export download failed:", chrome.runtime.lastError.message);
+            showStatus("Export failed: " + chrome.runtime.lastError.message, "error");
+          } else if (downloadId === undefined && !chrome.runtime.lastError) {
+            // Fallback for browsers that might not set lastError but return undefined on failure
+            console.error("Export download failed: No download ID returned and no error set.");
+            showStatus("Export failed. Please check browser settings or try again.", "error");
+          }
+          // If successful, downloadId should be a number.
+          // Browser's download UI provides primary success feedback.
           URL.revokeObjectURL(url);
         }
       );

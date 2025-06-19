@@ -41,6 +41,7 @@ const initDB = () => {
     
     dbRequest.onerror = (event) => {
       console.error("Database initialization error:", event.target.error);
+      dbInitPromise = null; // Allow future attempts to re-initialize
       reject(event.target.error);
     };
   });
