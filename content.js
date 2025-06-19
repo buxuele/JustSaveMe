@@ -16,9 +16,12 @@ function highlightSelection() {
   span.classList.add("justsaveme-highlight");
 
   try {
+    // It's generally better to get the text from the span after it has wrapped the content,
+    // or get it from the selection *before* surroundContents, as surroundContents can alter the selection.
+    // Getting from the span ensures we save the text that is actually visibly highlighted.
     range.surroundContents(span);
     return {
-      text: selection.toString(),
+      text: span.textContent, // Get text from the successfully created span
       element: span,
     };
   } catch (e) {
